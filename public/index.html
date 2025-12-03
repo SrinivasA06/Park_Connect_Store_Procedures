@@ -79,24 +79,6 @@
             font-size: 14px;
         }
         
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-        
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        
-        th {
-            background: #f9f9f9;
-            font-weight: 600;
-            color: #555;
-        }
-        
         .loading {
             color: #999;
             font-style: italic;
@@ -108,6 +90,67 @@
             background: #ffebee;
             border-radius: 3px;
             margin-top: 10px;
+        }
+        
+        .stat-card {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 4px;
+            margin-top: 15px;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .stat-value {
+            color: #333;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .stat-value.large {
+            font-size: 24px;
+            color: #4CAF50;
+        }
+        
+        .income-list {
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .income-item {
+            background: #f9f9f9;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .income-date {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .income-amount {
+            color: #4CAF50;
+            font-weight: 600;
+            font-size: 16px;
         }
         
         .chart-container {
@@ -347,34 +390,75 @@
             });
         }
         
+        function formatValue(key, value) {
+            if (value === null || value === undefined) return 'N/A';
+            
+            // Format currency fields
+            if (key.includes('payout') || key.includes('income') || key.includes('total')) {
+                const num = parseFloat(value);
+                if (!isNaN(num)) {
+                    return '$' + num.toFixed(2);
+                }
+            }
+            
+            // Format count fields
+            if (key.includes('count') || key.includes('bookings')) {
+                return value.toLocaleString();
+            }
+            
+            return value;
+        }
+        
+        function formatLabel(key) {
+            return key
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, l => l.toUpperCase());
+        }
+        
         function displayData(data, container) {
             if (!data || data.length === 0) {
                 container.innerHTML = '<span style="color: #999;">No data available</span>';
                 return;
             }
             
-            // Create table
-            let html = '<table>';
-            
-            // Header
-            html += '<thead><tr>';
-            Object.keys(data[0]).forEach(key => {
-                html += `<th>${key.replace(/_/g, ' ').toUpperCase()}</th>`;
-            });
-            html += '</tr></thead>';
-            
-            // Body
-            html += '<tbody>';
-            data.forEach(row => {
-                html += '<tr>';
-                Object.values(row).forEach(value => {
-                    html += `<td>${value !== null ? value : 'N/A'}</td>`;
+            // If single row result (like totals), display as card
+            if (data.length === 1) {
+                let html = '<div class="stat-card">';
+                
+                Object.entries(data[0]).forEach(([key, value]) => {
+                    const formattedValue = formatValue(key, value);
+                    const isMainStat = key.includes('total') || key.includes('count');
+                    
+                    html += `
+                        <div class="stat-row">
+                            <span class="stat-label">${formatLabel(key)}</span>
+                            <span class="stat-value ${isMainStat ? 'large' : ''}">${formattedValue}</span>
+                        </div>
+                    `;
                 });
-                html += '</tr>';
-            });
-            html += '</tbody></table>';
-            
-            container.innerHTML = html;
+                
+                html += '</div>';
+                container.innerHTML = html;
+            }
+            // If multiple rows (like income by day), display as list
+            else {
+                let html = '<div class="income-list">';
+                
+                data.forEach(row => {
+                    const date = row.income_date || row.date || Object.values(row)[0];
+                    const amount = row.total_payout || row.amount || Object.values(row)[1];
+                    
+                    html += `
+                        <div class="income-item">
+                            <span class="income-date">${date}</span>
+                            <span class="income-amount">${formatValue('total_payout', amount)}</span>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                container.innerHTML = html;
+            }
         }
         
         // Load total bookings on page load
