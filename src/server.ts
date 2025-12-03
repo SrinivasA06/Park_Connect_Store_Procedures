@@ -24,7 +24,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
 // API endpoint to fetch all bookings from Supabase
-app.post('/api/bookings', async (req: Request, res: Response): Promise<void> => {
+app.post('/api/bookings', async (_req: Request, res: Response): Promise<void> => {
     try {
         const response = await fetch(
             `${SUPABASE_URL}/rest/v1/rpc/get_total_bookings`,
@@ -41,7 +41,7 @@ app.post('/api/bookings', async (req: Request, res: Response): Promise<void> => 
         );
         
         if (!response.ok) {
-            const errorData: SupabaseError = await response.json();
+            const errorData = await response.json() as SupabaseError;
             res.status(response.status).json({
                 error: errorData.message || 'Failed to fetch bookings',
                 details: errorData.hint || errorData.details
@@ -49,7 +49,7 @@ app.post('/api/bookings', async (req: Request, res: Response): Promise<void> => 
             return;
         }
         
-        const data: BookingData[] = await response.json();
+        const data = await response.json() as BookingData[];
         res.json(data);
         
     } catch (error) {
@@ -89,7 +89,7 @@ app.post('/api/owner-totals', async (req: Request, res: Response): Promise<void>
         );
         
         if (!response.ok) {
-            const errorData: SupabaseError = await response.json();
+            const errorData = await response.json() as SupabaseError;
             res.status(response.status).json({
                 error: errorData.message || 'Failed to fetch owner totals',
                 details: errorData.hint || errorData.details
@@ -97,7 +97,7 @@ app.post('/api/owner-totals', async (req: Request, res: Response): Promise<void>
             return;
         }
         
-        const data: BookingData[] = await response.json();
+        const data = await response.json() as BookingData[];
         res.json(data);
         
     } catch (error) {
@@ -137,7 +137,7 @@ app.post('/api/owner-income', async (req: Request, res: Response): Promise<void>
         );
         
         if (!response.ok) {
-            const errorData: SupabaseError = await response.json();
+            const errorData = await response.json() as SupabaseError;
             res.status(response.status).json({
                 error: errorData.message || 'Failed to fetch owner income',
                 details: errorData.hint || errorData.details
@@ -145,7 +145,7 @@ app.post('/api/owner-income', async (req: Request, res: Response): Promise<void>
             return;
         }
         
-        const data: BookingData[] = await response.json();
+        const data = await response.json() as BookingData[];
         res.json(data);
         
     } catch (error) {
@@ -158,7 +158,7 @@ app.post('/api/owner-income', async (req: Request, res: Response): Promise<void>
 });
 
 // Health check endpoint
-app.get('/api/health', (req: Request, res: Response): void => {
+app.get('/api/health', (_req: Request, res: Response): void => {
     res.json({ 
         status: 'ok', 
         timestamp: new Date().toISOString(),
@@ -167,12 +167,12 @@ app.get('/api/health', (req: Request, res: Response): void => {
 });
 
 // Serve the main HTML page
-app.get('/', (req: Request, res: Response): void => {
+app.get('/', (_req: Request, res: Response): void => {
     res.sendFile(path.join(__dirname, '../public', 'index.html'));
 });
 
 // 404 handler
-app.use((req: Request, res: Response): void => {
+app.use((_req: Request, res: Response): void => {
     res.status(404).json({ error: 'Not found' });
 });
 
