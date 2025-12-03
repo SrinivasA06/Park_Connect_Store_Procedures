@@ -322,9 +322,7 @@
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    return 'Income: 
-</body>
-</html> + context.parsed.y.toFixed(2);
+                                    return 'Income: $' + context.parsed.y.toFixed(2);
                                 }
                             }
                         }
@@ -334,9 +332,7 @@
                             beginAtZero: true,
                             ticks: {
                                 callback: function(value) {
-                                    return '
-</body>
-</html> + value.toFixed(2);
+                                    return '$' + value.toFixed(2);
                                 }
                             }
                         },
