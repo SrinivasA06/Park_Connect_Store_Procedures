@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Owner Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: #f8f9fa;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            font-size: 28px;
+            margin-bottom: 30px;
+            color: #1a1a1a;
+            font-weight: 600;
+        }
+        
+        .input-section {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+        }
+        
+        .input-wrapper {
+            flex: 0 0 300px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 15px;
+            transition: border-color 0.2s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+        
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+        }
+        
+        .stat-label {
+            font-size: 13px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+        
+        .stat-main {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            color: #1a1a1a;
+            line-height: 1;
+        }
+        
+        .stat-value.currency::before {
+            content: '$';
+            font-size: 28px;
+            color: #666;
+            margin-right: 2px;
+        }
+        
+        .stat-change {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .stat-change.positive {
+            color: #10b981;
+        }
+        
+        .stat-change.negative {
+            color: #ef4444;
+        }
+        
+        .stat-change.neutral {
+            color: #6b7280;
+        }
+        
+        .change-arrow {
+            font-size: 16px;
+        }
+        
+        .period-label {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
+        
+        .rating-display {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+        
+        .stars {
+            color: #fbbf24;
+            font-size: 24px;
+        }
+        
+        .review-count {
+            color: #999;
+            font-size: 14px;
+        }
+        
+        .loading {
+            color: #999;
+            font-style: italic;
+            font-size: 14px;
+        }
+        
+        .error {
+            color: #dc2626;
+            padding: 12px 16px;
+            background: #fee;
+            border-radius: 6px;
+            font-size: 14px;
+            border-left: 3px solid #dc2626;
+        }
+        
+        .placeholder {
+            color: #999;
+            font-size: 14px;
+            text-align: center;
+            padding: 40px;
+        }
+        
+        @media (max-width: 1024px) {
+            .stats-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Owner Dashboard</h1>
+        
+        <div class="input-section">
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <label for="ownerIdInput">Owner ID</label>
+                    <input type="number" id="ownerIdInput" placeholder="Enter owner ID (e.g., 1)">
+                </div>
+            </div>
+        </div>
+        
+        <div id="dashboardContent" class="placeholder">
+            Enter an owner ID to view dashboard metrics
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://ndbzwrhgfrspeiycrnxs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kYnp3cmhnZnJzcGVpeWNybnhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MTc1NzYsImV4cCI6MjA3NzA5MzU3Nn0.TRPZcIqEe4eWmG0w8e_Q-V1pQlB_TKVNzMc7lbR7Fko';
+        
+        let debounceTimer;
+        
+        document.getElementById('ownerIdInput').addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            const ownerId = e.target.value.trim();
+            
+            if (!ownerId) {
+                document.getElementById('dashboardContent').innerHTML = '<div class="placeholder">Enter an owner ID to view dashboard metrics</div>';
+                return;
+            }
+            
+            debounceTimer = setTimeout(() => {
+                loadDashboard(ownerId);
+            }, 500);
+        });
+        
+        async function loadDashboard(ownerId) {
+            const container = document.getElementById('dashboardContent');
+            container.innerHTML = '<div class="placeholder"><span class="loading">Loading dashboard...</span></div>';
+            
+            try {
+                const [
+                    twoWeeksIncome,
+                    twoWeeksBookings,
+                    spaceRating
+                ] = await Promise.all([
+                    fetchData('get_owner_2weeks_income', ownerId),
+                    fetchData('get_owner_2weeks_bookings', ownerId),
+                    fetchData('get_owner_average_rating', ownerId)
+                ]);
+                
+                renderDashboard({
+                    twoWeeksIncome,
+                    twoWeeksBookings,
+                    spaceRating
+                });
+                
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                container.innerHTML = `<div class="error">Error loading dashboard: ${error.message}</div>`;
+            }
+        }
+        
+        async function fetchData(functionName, ownerId) {
+            const response = await fetch(
+                `${SUPABASE_URL}/rest/v1/rpc/${functionName}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=representation'
+                    },
+                    body: JSON.stringify({ p_owner_id: parseInt(ownerId) })
+                }
+            );
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `Failed to fetch ${functionName}`);
+            }
+            
+            return await response.json();
+        }
+        
+        function renderDashboard(data) {
+            const container = document.getElementById('dashboardContent');
+            
+            const currentIncome = data.twoWeeksIncome[0]?.current_income || 0;
+            const diffIncome = data.twoWeeksIncome[0]?.diff_income || 0;
+            
+            const currentBookings = data.twoWeeksBookings[0]?.current_count || 0;
+            const diffBookings = data.twoWeeksBookings[0]?.diff_count || 0;
+            
+            const avgRating = data.spaceRating[0]?.avg_rating || 0;
+            const reviewCount = data.spaceRating[0]?.review_count || 0;
+            
+            container.innerHTML = `
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <div class="stat-label">Last 2 Weeks Income</div>
+                        <div class="stat-main">
+                            <div class="stat-value currency">${formatCurrency(currentIncome)}</div>
+                        </div>
+                        <div class="stat-change ${getChangeClass(diffIncome)}">
+                            <span class="change-arrow">${getChangeArrow(diffIncome)}</span>
+                            <span>${formatCurrency(Math.abs(diffIncome))} vs previous 2 weeks</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">Last 2 Weeks Bookings</div>
+                        <div class="stat-main">
+                            <div class="stat-value">${currentBookings}</div>
+                        </div>
+                        <div class="stat-change ${getChangeClass(diffBookings)}">
+                            <span class="change-arrow">${getChangeArrow(diffBookings)}</span>
+                            <span>${Math.abs(diffBookings)} bookings vs previous 2 weeks</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">Space Rating</div>
+                        <div class="rating-display">
+                            <div class="stat-value">${avgRating.toFixed(1)}</div>
+                            <div class="stars">${renderStars(avgRating)}</div>
+                            <span class="review-count">(${reviewCount})</span>
+                        </div>
+                        <div class="period-label">Overall rating from guests</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function getChangeClass(value) {
+            if (value > 0) return 'positive';
+            if (value < 0) return 'negative';
+            return 'neutral';
+        }
+        
+        function getChangeArrow(value) {
+            if (value > 0) return '↑';
+            if (value < 0) return '↓';
+            return '→';
+        }
+        
+        function formatCurrency(num) {
+            return new Intl.NumberFormat('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(num);
+        }
+        
+        function renderStars(rating) {
+            const fullStars = Math.floor(rating);
+            const hasHalfStar = rating % 1 >= 0.5;
+            let stars = '';
+            
+            for (let i = 0; i < fullStars; i++) {
+                stars += '★';
+            }
+            if (hasHalfStar) {
+                stars += '☆';
+            }
+            
+            return stars;
+        }
+    </script>
+</body>
+</html>

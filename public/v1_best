@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookings Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .section:last-child {
+            border-bottom: none;
+        }
+        
+        h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #555;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        input {
+            width: 300px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        
+        .data-display {
+            margin-top: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        th {
+            background: #f9f9f9;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .loading {
+            color: #999;
+            font-style: italic;
+        }
+        
+        .error {
+            color: #d32f2f;
+            padding: 10px;
+            background: #ffebee;
+            border-radius: 3px;
+            margin-top: 10px;
+        }
+        
+        .debug-info {
+            background: #f0f0f0;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .chart-container {
+            margin-top: 20px;
+            height: 400px;
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bookings Dashboard</h1>
+        
+        <div class="section">
+            <h2>Total Bookings</h2>
+            <div class="data-display" id="totalBookingsDisplay">
+                <span class="loading">Loading...</span>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>Owner Totals</h2>
+            <div class="input-group">
+                <label for="ownerIdInput">Owner ID:</label>
+                <input type="number" id="ownerIdInput" placeholder="Enter owner ID (e.g., 1)">
+            </div>
+            <div class="data-display" id="ownerTotalsDisplay">
+                <span style="color: #999;">Enter an owner ID to view totals</span>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>Owner Income by Day</h2>
+            <div class="data-display" id="ownerIncomeDisplay">
+                <span style="color: #999;">Enter an owner ID above to view income chart</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="incomeChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://ndbzwrhgfrspeiycrnxs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kYnp3cmhnZnJzcGVpeWNybnhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MTc1NzYsImV4cCI6MjA3NzA5MzU3Nn0.TRPZcIqEe4eWmG0w8e_Q-V1pQlB_TKVNzMc7lbR7Fko';
+        
+        let incomeChart = null;
+        
+        // Enhanced error logging
+        function logError(context, error, response = null) {
+            console.error(`[${context}] Error:`, error);
+            if (response) {
+                console.error(`[${context}] Response status:`, response.status);
+                console.error(`[${context}] Response URL:`, response.url);
+            }
+        }
+        
+        // Load total bookings on page load
+        async function loadTotalBookings() {
+            const display = document.getElementById('totalBookingsDisplay');
+            
+            try {
+                console.log('Fetching total bookings...');
+                const response = await fetch(
+                    `${SUPABASE_URL}/rest/v1/rpc/get_total_bookings`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                            'Content-Type': 'application/json',
+                            'Prefer': 'return=representation'
+                        },
+                        body: JSON.stringify({})
+                    }
+                );
+                
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let errorData;
+                    try {
+                        errorData = JSON.parse(errorText);
+                    } catch (e) {
+                        errorData = { message: errorText };
+                    }
+                    
+                    logError('Total Bookings', errorData, response);
+                    
+                    display.innerHTML = `
+                        <div class="error">
+                            <strong>Error ${response.status}:</strong> ${errorData.message || 'Failed to fetch bookings'}
+                            ${errorData.hint ? `<br><small>Hint: ${errorData.hint}</small>` : ''}
+                            ${errorData.details ? `<br><small>Details: ${errorData.details}</small>` : ''}
+                        </div>
+                        <div class="debug-info">
+                            <strong>Debug Info:</strong><br>
+                            URL: ${response.url}<br>
+                            Status: ${response.status}<br>
+                            Response: ${errorText}
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const data = await response.json();
+                console.log('Total bookings data:', data);
+                displayData(data, display);
+                
+            } catch (error) {
+                logError('Total Bookings', error);
+                display.innerHTML = `
+                    <div class="error">
+                        <strong>Network Error:</strong> ${error.message}
+                        <br><small>Check console for details</small>
+                    </div>
+                    <div class="debug-info">
+                        <strong>Debug Info:</strong><br>
+                        Error type: ${error.constructor.name}<br>
+                        Message: ${error.message}<br>
+                        Supabase URL: ${SUPABASE_URL}
+                    </div>
+                `;
+            }
+        }
+        
+        // Load owner totals when owner ID changes
+        let debounceTimer;
+        document.getElementById('ownerIdInput').addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            const ownerId = e.target.value.trim();
+            
+            if (!ownerId) {
+                document.getElementById('ownerTotalsDisplay').innerHTML = '<span style="color: #999;">Enter an owner ID to view totals</span>';
+                document.getElementById('ownerIncomeDisplay').innerHTML = '<span style="color: #999;">Enter an owner ID above to view income chart</span>';
+                if (incomeChart) {
+                    incomeChart.destroy();
+                    incomeChart = null;
+                }
+                return;
+            }
+            
+            debounceTimer = setTimeout(() => {
+                loadOwnerTotals(ownerId);
+                loadOwnerIncome(ownerId);
+            }, 500);
+        });
+        
+        async function loadOwnerTotals(ownerId) {
+            const display = document.getElementById('ownerTotalsDisplay');
+            display.innerHTML = '<span class="loading">Loading...</span>';
+            
+            try {
+                console.log('Fetching owner totals for ID:', ownerId);
+                const response = await fetch(
+                    `${SUPABASE_URL}/rest/v1/rpc/get_owner_totals`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                            'Content-Type': 'application/json',
+                            'Prefer': 'return=representation'
+                        },
+                        body: JSON.stringify({ p_owner_id: parseInt(ownerId) })
+                    }
+                );
+                
+                console.log('Owner totals response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let errorData;
+                    try {
+                        errorData = JSON.parse(errorText);
+                    } catch (e) {
+                        errorData = { message: errorText };
+                    }
+                    
+                    logError('Owner Totals', errorData, response);
+                    
+                    display.innerHTML = `
+                        <div class="error">
+                            <strong>Error ${response.status}:</strong> ${errorData.message || 'Failed to fetch owner totals'}
+                            ${errorData.hint ? `<br><small>Hint: ${errorData.hint}</small>` : ''}
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const data = await response.json();
+                console.log('Owner totals data:', data);
+                displayData(data, display);
+                
+            } catch (error) {
+                logError('Owner Totals', error);
+                display.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+        
+        async function loadOwnerIncome(ownerId) {
+            const display = document.getElementById('ownerIncomeDisplay');
+            display.innerHTML = '<span class="loading">Loading chart...</span>';
+            
+            try {
+                console.log('Fetching owner income for ID:', ownerId);
+                const response = await fetch(
+                    `${SUPABASE_URL}/rest/v1/rpc/get_owner_income_by_day`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                            'Content-Type': 'application/json',
+                            'Prefer': 'return=representation'
+                        },
+                        body: JSON.stringify({ p_owner_id: parseInt(ownerId) })
+                    }
+                );
+                
+                console.log('Owner income response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let errorData;
+                    try {
+                        errorData = JSON.parse(errorText);
+                    } catch (e) {
+                        errorData = { message: errorText };
+                    }
+                    
+                    logError('Owner Income', errorData, response);
+                    
+                    display.innerHTML = `
+                        <div class="error">
+                            <strong>Error ${response.status}:</strong> ${errorData.message || 'Failed to fetch owner income'}
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const data = await response.json();
+                console.log('Owner income data:', data);
+                
+                if (!data || data.length === 0) {
+                    display.innerHTML = '<span style="color: #999;">No income data available for this owner</span>';
+                    if (incomeChart) {
+                        incomeChart.destroy();
+                        incomeChart = null;
+                    }
+                    return;
+                }
+                
+                displayData(data, display);
+                renderIncomeChart(data);
+                
+            } catch (error) {
+                logError('Owner Income', error);
+                display.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+        
+        function renderIncomeChart(data) {
+            const ctx = document.getElementById('incomeChart');
+            
+            // Destroy previous chart if exists
+            if (incomeChart) {
+                incomeChart.destroy();
+            }
+            
+            // Prepare data
+            const dates = data.map(item => item.income_date);
+            const payouts = data.map(item => parseFloat(item.total_payout));
+            
+            // Create chart
+            incomeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Daily Income ($)',
+                        data: payouts,
+                        borderColor: '#4CAF50',
+                        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Income: $' + context.parsed.y.toFixed(2);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toFixed(2);
+                                }
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function displayData(data, container) {
+            if (!data || data.length === 0) {
+                container.innerHTML = '<span style="color: #999;">No data available</span>';
+                return;
+            }
+            
+            // Create table
+            let html = '<table>';
+            
+            // Header
+            html += '<thead><tr>';
+            Object.keys(data[0]).forEach(key => {
+                html += `<th>${key.replace(/_/g, ' ').toUpperCase()}</th>`;
+            });
+            html += '</tr></thead>';
+            
+            // Body
+            html += '<tbody>';
+            data.forEach(row => {
+                html += '<tr>';
+                Object.values(row).forEach(value => {
+                    html += `<td>${value !== null ? value : 'N/A'}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            
+            container.innerHTML = html;
+        }
+        
+        // Load total bookings on page load
+        console.log('Page loaded, initializing...');
+        loadTotalBookings();
+    </script>
+</body>
+</html>
